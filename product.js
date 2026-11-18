@@ -1,20 +1,20 @@
 (() => {
- const cfg=window.SHOP_CONFIG||{},sb=window.supabase?.createClient(cfg.supabaseUrl,cfg.supabasePublishableKey),$=id=>document.getElementById(id),esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),money=x=>`${new Intl.NumberFormat('ar-SA',{maximumFractionDigits:2}).format(Number(x)||0)} ر.س`,params=new URLSearchParams(location.search);let product=null,selectedColor='',qty=1,brandImageObserver=null;
+ const cfg=window.SHOP_CONFIG||{},sb=window.supabase?.createClient(cfg.supabaseUrl,cfg.supabasePublishableKey),$=id=>document.getElementById(id),esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),money=x=>`${new Intl.NumberFormat('ar-SA',{maximumFractionDigits:2}).format(Number(x)||0)} ر.س`,params=new URLSearchParams(location.search),imageCacheReady=(()=>{if(window.WesamImageCache)return Promise.resolve(window.WesamImageCache);return new Promise(resolve=>{const script=document.createElement('script');script.src='image-cache.js?v=1';script.onload=()=>resolve(window.WesamImageCache||null);script.onerror=()=>resolve(null);document.head.append(script);});})();let product=null,selectedColor='',qty=1,brandImageObserver=null;
  const colorHex={'أسود':'#202421','أبيض':'#fff','أحمر':'#d94a46','أزرق':'#3274b9','سماوي':'#68b9cc','أخضر':'#47966b','زيتي':'#78814a','أصفر':'#f2cb4a','برتقالي':'#e89042','وردي':'#e88ba8','بنفسجي':'#8c69b5','بني':'#8b6045','رمادي':'#9ea5a1','فضي':'#c9ccca','ذهبي':'#d1ae62','بيج':'#d9c8aa','كحلي':'#263c65','شفاف':'#edf3f0'};
  const productName=p=>p.type||(p.product_code?`صنف ${p.product_code}`:'منتج إكسسوارات');
- function originalImageUrl(raw){if(!raw)return'';const s=String(raw).trim();if(/^https?:\/\//i.test(s)||s.startsWith('data:image/'))return s;const m=s.match(/(?:storage\/v1\/object\/public\/)([^/]+)\/(.+)$/),bucket=m?.[1]||cfg.storageBucket,path=m?.[2]||s.replace(/^\/+/, '');return bucket&&sb?sb.storage.from(bucket).getPublicUrl(path).data.publicUrl:'';}
+ function originalImageUrl(raw){if(!raw)return'';const s=String(raw).trim();if(/^(https?:\/\/|blob:)/i.test(s)||s.startsWith('data:image/'))return s;const m=s.match(/(?:storage\/v1\/object\/public\/)([^/]+)\/(.+)$/),bucket=m?.[1]||cfg.storageBucket,path=m?.[2]||s.replace(/^\/+/, '');return bucket&&sb?sb.storage.from(bucket).getPublicUrl(path).data.publicUrl:'';}
  function imageUrl(raw,width=900,quality=76){const src=originalImageUrl(raw);if(!src||src.startsWith('data:image/'))return src;try{const url=new URL(src);if(!url.pathname.includes('/storage/v1/object/public/'))return src;url.pathname=url.pathname.replace('/storage/v1/object/public/','/storage/v1/render/image/public/');url.searchParams.set('width',String(width));url.searchParams.set('quality',String(quality));url.searchParams.set('resize','contain');return url.href;}catch{return src;}}
  function handleImageError(img,raw,onFinalError){if(img.dataset.handlingError==='1')return;img.dataset.handlingError='1';setTimeout(()=>{img.dataset.handlingError='0';},0);const original=originalImageUrl(raw);if(original&&img.dataset.fallback!=='1'&&img.src!==original){img.dataset.fallback='1';img.src=original;return;}onFinalError?.();}
  async function loadImageInto(box,id,alt,width,quality,existingImage=null,onFinalError=null){
-   const {data,error}=await sb.from('store_products').select('image').eq('id',id).maybeSingle();
-   if(error||!data?.image)return;
-   const raw=data.image,img=existingImage||document.createElement('img');
-   if(product&&String(product.id)===String(id))product.image=raw;
-   img.alt=alt||'';img.loading='lazy';img.decoding='async';
-   img.addEventListener('load',()=>{if(existingImage){img.hidden=false;$('detail-placeholder').hidden=true;}else box.replaceChildren(img);},{once:true});
-   const finalError=onFinalError||(()=>box.replaceChildren(Object.assign(document.createElement('span'),{className:'image-placeholder',textContent:'▧'})));
-   img.addEventListener('error',()=>handleImageError(img,raw,finalError));
-   img.src=imageUrl(raw,width,quality);
+   const img=existingImage||document.createElement('img'),finalError=onFinalError||(()=>box.replaceChildren(Object.assign(document.createElement('span'),{className:'image-placeholder',textContent:'▧'})));
+   img.alt=alt||'';img.loading='lazy';img.decoding='async';img.onload=()=>{if(existingImage){img.hidden=false;$('detail-placeholder').hidden=true;}else box.replaceChildren(img);};img.onerror=()=>handleImageError(img,img.dataset.raw||img.src,finalError);
+   const cache=await imageCacheReady,cached=await cache?.get(id);
+   if(cached?.blob){img.dataset.raw='';img.src=URL.createObjectURL(cached.blob);if(cache.isFresh(cached)||!navigator.onLine)return;}
+   if(!navigator.onLine||!sb)return;
+   const {data,error}=await sb.from('store_products').select('image').eq('id',id).maybeSingle();if(error||!data?.image)return;
+   const raw=data.image;if(product&&String(product.id)===String(id))product.image=raw;img.dataset.raw=raw;
+   const thumbnail=await cache?.toThumbnail([imageUrl(raw,width,quality),originalImageUrl(raw)],Math.min(1000,Math.max(width,700)),.78);
+   if(thumbnail){await cache.put(id,thumbnail);img.dataset.raw='';img.src=URL.createObjectURL(thumbnail);}else img.src=imageUrl(raw,width,quality);
  }
  function observeBrandImages(){const links=[...$('other-brands-list').querySelectorAll('.other-brand-card[data-product-id]')];if(!links.length)return;if(!('IntersectionObserver'in window)){links.slice(0,2).forEach(link=>loadImageInto(link.querySelector('.other-brand-image'),link.dataset.productId,link.querySelector('strong')?.textContent,170,65));return;}brandImageObserver?.disconnect();brandImageObserver=new IntersectionObserver(entries=>{for(const entry of entries)if(entry.isIntersecting){brandImageObserver.unobserve(entry.target);loadImageInto(entry.target.querySelector('.other-brand-image'),entry.target.dataset.productId,entry.target.querySelector('strong')?.textContent,170,65);}},{rootMargin:'100px'});links.forEach(link=>brandImageObserver.observe(link));}
  async function loadDetailImage(id){const box=$('detail-image-wrap'),img=$('detail-image');img.hidden=true;$('detail-placeholder').hidden=false;await loadImageInto(box,id,productName(product),1000,78,img,()=>{img.hidden=true;$('detail-placeholder').hidden=false;});}
