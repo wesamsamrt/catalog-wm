@@ -33,6 +33,26 @@
     } catch { return null; }
   }
 
+  async function getMany(ids) {
+    try {
+      const db = await openDb();
+      if (!db || !ids?.length) return {};
+      return await new Promise(resolve => {
+        const result = {};
+        const tx = db.transaction(STORE_NAME, 'readonly');
+        const store = tx.objectStore(STORE_NAME);
+        for (const id of ids) {
+          const key = String(id);
+          const request = store.get(key);
+          request.onsuccess = () => { result[key] = request.result || null; };
+          request.onerror = () => { result[key] = null; };
+        }
+        tx.oncomplete = () => resolve(result);
+        tx.onerror = tx.onabort = () => resolve(result);
+      });
+    } catch { return {}; }
+  }
+
   async function put(id, blob) {
     try {
       const db = await openDb();
@@ -73,5 +93,5 @@
     return null;
   }
 
-  window.WesamImageCache = { get, put, isFresh, toThumbnail };
+  window.WesamImageCache = { get, getMany, put, isFresh, toThumbnail };
 })();
