@@ -5,3 +5,4 @@
 
 .detail-info .other-brands{margin-top:26px;padding-top:19px}.detail-info .other-brands-grid{grid-template-columns:1fr;gap:9px;margin-top:13px}
 .detail-actions .detail-add-button{position:relative;z-index:2;pointer-events:auto!important;opacity:1!important;cursor:pointer!important}.detail-actions .detail-add-button:disabled{opacity:1!important;cursor:pointer!important}
+.quantity-presets{display:flex;align-items:center;flex-wrap:wrap;gap:7px;margin:14px 0 10px}.quantity-presets>span{font-size:11px;color:#77847c;margin-left:3px}.quantity-preset{min-width:42px;height:34px;padding:0 11px;border:1px solid #E3EBF2;border-radius:10px;background:#fff;color:#286FA8;font:inherit;font-size:12px;transition:background .15s,color .15s,border-color .15s}.quantity-preset:hover,.quantity-preset.selected{background:#2B7FC1;border-color:#2B7FC1;color:#fff}.quantity-preset:focus-visible{outline:3px solid #DCECF8}
